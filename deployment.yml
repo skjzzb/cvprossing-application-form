@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gs-talent-services
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: gs-talent-services
+    spec:
+      containers:
+      - name: gs-talent-services
+        image: registry.gitlab.com/atech-project/gs-talent-services
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+      imagePullSecrets:
+        - name: registry.gitlab.com
