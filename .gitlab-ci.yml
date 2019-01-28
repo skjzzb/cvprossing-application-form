@@ -22,9 +22,9 @@ maven-build:
 docker-build:
   stage: package
   script:
-  - docker build -t registry.gitlab.com/atech-project/gs-restful-ws .
+  - docker build -t registry.gitlab.com/atech-project/gs-talent-services .
   - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN registry.gitlab.com
-  - docker push registry.gitlab.com/atech-project/gs-restful-ws
+  - docker push registry.gitlab.com/atech-project/gs-talent-services
 
 k8s-deploy:
   image: google/cloud-sdk
@@ -33,9 +33,9 @@ k8s-deploy:
   - echo "$GOOGLE_KEY" > key.json
   - gcloud auth activate-service-account --key-file key.json
   - gcloud config set compute/zone europe-west1-c
-  - gcloud config set project gs-restful-ws
+  - gcloud config set project gs-talent
   - gcloud config set container/use_client_certificate True
-  - gcloud container clusters get-credentials gs-restful-ws
+  - gcloud container clusters get-credentials gs-talent
   - kubectl delete secret registry.gitlab.com
   - kubectl create secret docker-registry registry.gitlab.com 
 --docker-server=https://registry.gitlab.com --docker-username=anand-joshi 
