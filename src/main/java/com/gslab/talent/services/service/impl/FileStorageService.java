@@ -1,6 +1,7 @@
 package com.gslab.talent.services.service.impl;
 
 import java.io.IOException;
+
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,9 +26,10 @@ public class FileStorageService {
 
     @Autowired
     public FileStorageService(FileStorageProperties fileStorageProperties) {
+//    	System.out.println("path---"+Paths.get(fileStorageProperties.getUploadDir()));
         this.fileStorageLocation = Paths.get(fileStorageProperties.getUploadDir())
                 .toAbsolutePath().normalize();
-
+     
         try {
             Files.createDirectories(this.fileStorageLocation);
         } catch (Exception ex) {
@@ -38,6 +40,7 @@ public class FileStorageService {
     public String storeFile(MultipartFile file) {
         // Normalize file name
         String fileName = StringUtils.cleanPath(file.getOriginalFilename());
+        System.out.println("filestrLoc"+" "+this.fileStorageLocation);
 
         try {
             // Check if the file's name contains invalid characters
@@ -47,6 +50,7 @@ public class FileStorageService {
 
             // Copy file to the target location (Replacing existing file with the same name)
             Path targetLocation = this.fileStorageLocation.resolve(fileName);
+            System.out.println("target"+targetLocation);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
             return fileName;

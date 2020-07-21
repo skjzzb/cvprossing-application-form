@@ -1,6 +1,7 @@
 package com.gslab.talent.services.entities;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.util.Date;
 
 import javax.persistence.Basic;
@@ -14,6 +15,8 @@ import javax.persistence.Table;
 import javax.persistence.TableGenerator;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+
+import net.bytebuddy.asm.Advice.This;
 
 
 /**
@@ -29,6 +32,10 @@ public class CandidateProfile implements Serializable {
 	public CandidateProfile(String createUser, String fileDownloadURL, String fileName, long fileSize, String fileType,
 			String isMLProcessed) {
 		super();
+//		this.createTime = java.time.LocalDate.now();
+//		this.createTime = new java.util.Date();  
+//		System.out.println(this.createTime );
+		
 		this.createUser = createUser;
 		this.fileDownloadURL = fileDownloadURL;
 		this.fileName = fileName;
@@ -43,10 +50,10 @@ public class CandidateProfile implements Serializable {
 	@Column(name= "profileid", unique=true, nullable=false)
 	private int profileId;
 
-	@Basic(optional = false)
-	@Column(name = "create_time", insertable = false, updatable = false)
-	@Temporal(TemporalType.TIMESTAMP)
-	private Date createTime;
+//	@Basic(optional = true)
+//	@Column(name = "create_time", insertable = false, updatable = false,columnDefinition = "int default 1")
+//	@Temporal(TemporalType.TIMESTAMP)
+//	private Date createTime;
 
 	@Column(name="create_user", length=45)
 	private String createUser;
@@ -69,13 +76,13 @@ public class CandidateProfile implements Serializable {
 	public CandidateProfile() {
 	}
 
-	public Date getCreateTime() {
-		return this.createTime;
-	}
-
-	public void setCreateTime(Date createTime) {
-		this.createTime = createTime;
-	}
+//	public Date getCreateTime() {
+//		return this.createTime;
+//	}
+//
+//	public void setCreateTime(Date createTime) {
+//		this.createTime = createTime;
+//	}
 
 	public String getCreateUser() {
 		return this.createUser;
