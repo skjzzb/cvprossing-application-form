@@ -1,0 +1,109 @@
+
+1. What will be the o/p of the following code
+#include <stdio.h>
+int main(void)
+{
+
+	int num=10;
+	int *ptr=&num;;
+	int **pptr=NULL;
+
+	pptr=&ptr+1;
+
+	printf("%d",**--pptr+1);
+	return 0;
+}
+2. const int *ptr;
+Which is true about above statement
+I ptr is constant pointer pointing to constant integer value
+II ptr is non constant pointer pointing to constant integer value
+III ptr is constant pointer
+IV ptr is non constant pointer pointing to non constant integer value
+3. What will be the o/p of the following code
+#include <stdio.h>
+int num=10;
+void update(int *ptr)
+{
+	*ptr+=num;
+}
+int main(void)
+{
+	int num=100;
+	printf("%d\n",num);
+	update(&num);
+	printf("%d\n",num);
+}
+4. #include <stdio.h>
+int main(void)
+{
+	char num=256;
+	int *ptr=&num;
+	*ptr++;
+	int *ptr2=--ptr;
+	printf("%d",*(char *)ptr2);
+}
+5. #include <stdio.h>
+int main(void)
+{
+	int num=10;
+	int *ptr=&num;
+	++*ptr++;
+	printf("%d",num);
+	printf("%d",*--ptr);
+}
+6. What will be the o/p of the following code
+#include <stdio.h>
+int main(void)
+{
+	int arr[5]={10,20,30,40,50};
+	int *ptr;
+	ptr = arr+2;
+	*ptr=33;
+	*ptr++;
+	printf("%d",--*ptr);
+}
+7. What will be the o/p of the following code
+#include <stdio.h>
+int update(int *ptr,int num2)
+{
+	return *++ptr + num2;
+}
+int main(void)
+{
+
+	int num1=100;
+	int num2=10;
+	int value = update(&num1,num2);
+	printf("%d",value);
+}
+8. What will be the o/p of the following code
+#include <stdio.h>
+int* update(int *ptr)
+{
+	int number=10;
+	number=number + *ptr;
+	return &number;
+}
+int main(void)
+{
+	int *ptr;
+	int num=10;
+	*ptr = update(&num);
+	printf("%d",*ptr);
+
+}
+
+9. What will be the o/p of the following code
+If P is a pointer to an integer and T is a pointer to a character then scale factor of P will be
+
+
+10. #include <stdio.h>
+int main(void)
+{
+	const int num = 100;
+	int *ptr = &num;
+	*ptr=20;
+	++(++*ptr);
+	printf("%d",num);
+	printf("%d",*ptr);
+}

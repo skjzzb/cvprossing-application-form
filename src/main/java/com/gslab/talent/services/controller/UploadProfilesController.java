@@ -3,6 +3,8 @@ package com.gslab.talent.services.controller;
 import java.io.IOException;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,6 +30,8 @@ import com.gslab.talent.services.service.impl.FileStorageService;
 
 //file
 import java.io.InputStreamReader;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.List;
 
@@ -55,14 +59,15 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.drive.Drive;
+import com.google.api.services.drive.Drive.Files;
 import com.google.api.services.drive.DriveScopes;
 import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
 
 @CrossOrigin
 @RestController
 public class UploadProfilesController {
 
-	//file 
 	private static HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 	
@@ -77,6 +82,9 @@ public class UploadProfilesController {
 	@Value("${google.secret.key.path}")
 	private Resource gdSecretKeys;
 
+	@Value("${google.drive.parentfolder.id}")
+	private String gdriveParentFolderId;
+	
 	@Value("${google.credentials.folder.path}")
 	private Resource credentialsFolder;
 	
@@ -84,7 +92,6 @@ public class UploadProfilesController {
 	private Resource serviceAccountKey;
 
 	private GoogleAuthorizationCodeFlow flow;
-	//end
 	
 	@Autowired
     private FileStorageService fileStorageService;
@@ -92,17 +99,18 @@ public class UploadProfilesController {
 	@Autowired
     private CandidateProfileService candidateProfileService;
 	
-	//start
+	//Google Secrets
 	@PostConstruct
-	public void init() throws Exception {
+	public void init() throws IOException  {
 		GoogleClientSecrets secrets = GoogleClientSecrets.load(JSON_FACTORY,
 				new InputStreamReader(gdSecretKeys.getInputStream()));
 		flow = new GoogleAuthorizationCodeFlow.Builder(HTTP_TRANSPORT, JSON_FACTORY, secrets, SCOPES)
 				.setDataStoreFactory(new FileDataStoreFactory(credentialsFolder.getFile())).build();
 	}
 	
+	//check if user is Authenticated
 	@GetMapping(value = { "/home" })
-	public String showHomePage() throws Exception {
+	public String showHomePage() throws IOException  {
 		boolean isUserAuthenticated = false;
 
 		Credential credential = flow.loadCredential(USER_IDENTIFIER_KEY);
@@ -112,16 +120,18 @@ public class UploadProfilesController {
 				isUserAuthenticated = true;
 			}
 		}
-
 		return isUserAuthenticated ? "dashboard.html" : "index.html";
 	}
 	
+	//Sign-in with google Account
+	@GetMapping(value = { "/googlesignin" })
 	public void doGoogleSignIn(HttpServletResponse response) throws Exception {
 		GoogleAuthorizationCodeRequestUrl url = flow.newAuthorizationUrl();
 		String redirectURL = url.setRedirectUri(CALLBACK_URI).setAccessType("offline").build();
 		response.sendRedirect(redirectURL);
 	}
 
+	//callback URI for google Oauth2.o
 	@GetMapping(value = { "/oauth" })
 	public String saveAuthorizationCode(HttpServletRequest request) throws Exception {
 		String code = request.getParameter("code");
@@ -134,50 +144,117 @@ public class UploadProfilesController {
 		return "index.html";
 	}
 
-	private void saveToken(String code) throws Exception {
+	//Save authenticated User Token
+	private void saveToken(String code) throws IOException  {
 		GoogleTokenResponse response = flow.newTokenRequest(code).setRedirectUri(CALLBACK_URI).execute();
 		flow.createAndStoreCredential(response, USER_IDENTIFIER_KEY);
 
 	}
-	//end
-    
+
+    //Create String with current date in format "dd-MM-yyyy"
+	public String getOrCreateFolderName(Date argDate)
+	{
+		   String format = "dd-MM-yyyy";
+           DateFormat dateFormatter = new SimpleDateFormat(format);
+           return dateFormatter.format(argDate);
+           
+	}
+	
+	//Create or get folder id on Google drive
+	public String getOrCreateDailyLogDirectory(Drive drive, String folderName) throws IOException
+	{
+		String pageToken = null;
+		boolean doesntExists = true;
+		File newFolder;
+		
+		//Iterate over all Pages in Drive to search folder
+		do {
+			
+			//Searches folder in drive with a query for filtering the folder results
+			  FileList result = drive.files().list()
+					  			.setQ("mimeType='application/vnd.google-apps.folder' and trashed=false and name='"+folderName+"'")
+					  			.setSpaces("drive")
+					  			.setFields("nextPageToken, files(id, name)")
+					  			.setPageToken(pageToken)
+					  			.execute();
+			  
+			  //Iterate through all result
+			  for (File folder : result.getFiles()) {
+				  System.out.println("Found file : "+folder.getName()+" id:"+ folder.getId());
+				  
+				  //If the name exists return the id of the folder
+				  if( folder.getName().equals(folderName)  )
+				  {
+					  doesntExists = false;
+					  newFolder = folder;
+					  return newFolder.getId();
+				  } 
+			  }
+			  
+			  //get next page token 
+			  pageToken = result.getNextPageToken();
+		} while (pageToken != null);
+		
+		  //If the name doesn't exists, then create a new folder
+		  if(doesntExists = true){
+			  
+		      //If the file doesn't exists
+			  File fileMetadata = new File();
+			  fileMetadata.setName(folderName);
+			  fileMetadata.setMimeType("application/vnd.google-apps.folder");
+			  //set parent folder 
+			  fileMetadata.setParents(Collections.singletonList(gdriveParentFolderId));
+			  
+			  newFolder = drive.files().create(fileMetadata)
+					    .setFields("id")
+					    .execute();
+			  
+		    return newFolder.getId();
+		  }
+		return gdriveParentFolderId;
+	}
+	
     @PostMapping("/uploadprofile")
     public CandidateProfile uploadFile(@RequestParam("file") MultipartFile file) {
         String fileName = fileStorageService.storeFile(file);
         String type =  file.getContentType();
         
         try {
-			this.uploadFileInFolder(fileName, type);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-//        System.out.println(file_Name);
+				this.uploadFileInFolder(fileName, type);
+			} catch (Exception e){
+				
+				e.printStackTrace();
+			}
+
         String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/downloadprofile/")
-                .path(fileName)
-                .toUriString();
-        System.out.println(fileDownloadUri);
-        System.out.println(fileName);
-        System.out.println(file.getSize());
-        System.out.println(file.getContentType());
-        
+							                .path("/downloadprofile/")
+							                .path(fileName)
+							                .toUriString();  
         CandidateProfile candidateProfile = new CandidateProfile("HR", fileDownloadUri, fileName, file.getSize(), file.getContentType(), "N");
+        
         // Insert Record into Candidate Profile Table
         candidateProfileService.createCandidateProfile(candidateProfile);
         
         return candidateProfile;
     }
-    public void uploadFileInFolder(String fileName,String type) throws Exception {
+    
+    public void uploadFileInFolder(String fileName,String type) throws IOException  {
 		Credential cred = flow.loadCredential(USER_IDENTIFIER_KEY);
 
 		Drive drive = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, cred)
 				.setApplicationName("GoogleDriveSpringBootExample").build();
 
+		//get folder name as string
+		String folderName = this.getOrCreateFolderName(new Date());	
+		String folderId = this.getOrCreateDailyLogDirectory( drive,folderName );
+		System.out.println("Folder id :" +folderId);
+		
+		//set file name and its parent folder
 		File file = new File();
 		file.setName(fileName);
-//		file.setParents(Arrays.asList("1_TsS7arQRBMY2t4NYKNdxta8Ty9r6wva"));
+		file.setParents(Arrays.asList(folderId));
 
+		//get file content 
 		FileContent content = new FileContent(type, new java.io.File("/home/ashu/GSLAB/upload_file/gs-talent-services/uploadFiles/"+fileName));
 		File uploadedFile = drive.files().create(file, content).setFields("id").execute();
 
@@ -186,13 +263,13 @@ public class UploadProfilesController {
 	}
 	
 
-//    @PostMapping("/uploadmultipleprofiles")
-//    public List<CandidateProfile> uploadMultipleFiles(@RequestParam("files") MultipartFile[] files) {
-//        return Arrays.asList(files)
-//                .stream()
-//                .map(file -> uploadFile(file))
-//                .collect(Collectors.toList());
-//    }
+    @PostMapping("/uploadmultipleprofiles")
+    public List<CandidateProfile> uploadMultipleFiles(@RequestParam("files") MultipartFile[] files) {
+        return Arrays.asList(files)
+                .stream()
+                .map(file -> uploadFile(file))
+                .collect(Collectors.toList());
+    }
 
     @GetMapping("/downloadprofile/{fileName:.+}")
     public ResponseEntity<Resource> downloadFile(@PathVariable String fileName, HttpServletRequest request) {
@@ -204,7 +281,7 @@ public class UploadProfilesController {
         try {
             contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
         } catch (IOException ex) {
-            //logger.info("Could not determine file type.");
+           // logger.info("Could not determine file type.");
         }
 
         // Fallback to the default content type if type could not be determined
