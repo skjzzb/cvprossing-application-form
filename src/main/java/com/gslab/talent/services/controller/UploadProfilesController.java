@@ -2,6 +2,15 @@ package com.gslab.talent.services.controller;
 
 import java.io.IOException;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+//import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -13,12 +22,14 @@ import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,6 +53,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -84,6 +96,9 @@ public class UploadProfilesController {
 
 	@Value("${google.drive.parentfolder.id}")
 	private String gdriveParentFolderId;
+	
+	@Value("${google.drive.parentfolder.images.id}")
+	private String gdriveImageFolderId;
 	
 	@Value("${google.credentials.folder.path}")
 	private Resource credentialsFolder;
@@ -215,17 +230,26 @@ public class UploadProfilesController {
 	}
 	
     @PostMapping("/uploadprofile")
-    public CandidateProfile uploadFile(@RequestParam("file") MultipartFile file) {
-        String fileName = fileStorageService.storeFile(file);
+    public CandidateProfile uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
+//        String fileName = fileStorageService.storeFile(file);
+    	String fileName = StringUtils.cleanPath(file.getOriginalFilename());
+    	System.out.println("file to be uploadede: "+fileName);
+    	
         String type =  file.getContentType();
+        String systemPath = this.createFolder("uploadFiles");
+        
+        java.io.File convertFile = new java.io.File(systemPath+java.io.File.separator+file.getOriginalFilename());
+		  convertFile.createNewFile();
+		  FileOutputStream fout = new FileOutputStream(convertFile);
+		  fout.write(file.getBytes());
+		  fout.close();
         
         try {
-				this.uploadFileInFolder(fileName, type);
+				this.uploadFileInFolder(fileName,type,systemPath);
 			} catch (Exception e){
 				
 				e.printStackTrace();
 			}
-
         String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
 							                .path("/downloadprofile/")
 							                .path(fileName)
@@ -238,7 +262,7 @@ public class UploadProfilesController {
         return candidateProfile;
     }
     
-    public void uploadFileInFolder(String fileName,String type) throws IOException  {
+    public void uploadFileInFolder(String fileName,String type,String tempPath) throws IOException  {
 		Credential cred = flow.loadCredential(USER_IDENTIFIER_KEY);
 
 		Drive drive = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, cred)
@@ -254,20 +278,47 @@ public class UploadProfilesController {
 		file.setName(fileName);
 		file.setParents(Arrays.asList(folderId));
 
+		System.out.println("file path: "+tempPath+java.io.File.separator+fileName);
+		
 		//get file content 
-		FileContent content = new FileContent(type, new java.io.File("/home/ashu/GSLAB/upload_file/gs-talent-services/uploadFiles/"+fileName));
+//		FileContent content = new FileContent(type, new java.io.File("/home/ashu/GSLAB/upload_file/gs-talent-services/uploadFiles/"+fileName));
+		FileContent content = new FileContent(type, new java.io.File(tempPath+java.io.File.separator+fileName));
 		File uploadedFile = drive.files().create(file, content).setFields("id").execute();
 
 		String fileReference = String.format("{fileID: '%s'}", uploadedFile.getId());
 
 	}
+    
+    public void uploadProfileImage(String tempPath,String type,String fileName) throws IOException 
+    {
+		Credential cred = flow.loadCredential(USER_IDENTIFIER_KEY);
+
+		Drive drive = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, cred)
+				.setApplicationName("GoogleDriveSpringBootExample").build();
+		
+		File file = new File();
+		file.setName(fileName);
+		file.setParents(Arrays.asList(gdriveImageFolderId));
+
+		//get file content 
+		FileContent content = new FileContent(type, new java.io.File(tempPath));
+		File uploadedFile = drive.files().create(file, content).setFields("id").execute();
+    }
 	
 
     @PostMapping("/uploadmultipleprofiles")
-    public List<CandidateProfile> uploadMultipleFiles(@RequestParam("files") MultipartFile[] files) {
+    public List<CandidateProfile> uploadMultipleFiles(@RequestParam("files") MultipartFile[] files) throws IOException{
         return Arrays.asList(files)
                 .stream()
-                .map(file -> uploadFile(file))
+                .map(file -> {
+					try {
+						return uploadFile(file);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					return null;
+				})
                 .collect(Collectors.toList());
     }
 
@@ -294,4 +345,44 @@ public class UploadProfilesController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
                 .body(resource);
     }
+    
+    public String createFolder(String folderName)
+	{
+//		System.out.println(System.getProperty("java.io.tmpdir"));
+	    final String baseTempPath = System.getProperty("java.io.tmpdir");
+
+	    java.io.File tempDir = new java.io.File(baseTempPath + java.io.File.separator + folderName);
+	    if (tempDir.exists() == false) {
+	        tempDir.mkdir();
+	    }
+	   System.out.println("my file path:"+tempDir);
+	   return tempDir.getPath();
+	}
+    
+    @PutMapping("/upload/{profId}")
+  	public ResponseEntity<?> uplaodImage(@RequestParam("imageFile") MultipartFile file,@PathVariable Integer profId) throws IOException 
+  	  {
+    	  
+    	  String newFileName = profId.toString().concat(".jpeg");
+  	      String systemPath=createFolder("images");
+  	      System.out.println(systemPath);
+  		  System.out.println("-------------------"+profId);
+  		  System.out.println("Original Image Byte Size - " + file.getBytes().length);
+  		  
+  		  System.out.println("File name : "+file.getOriginalFilename());
+  		  
+  		  java.io.File convertFile = new java.io.File(systemPath+java.io.File.separator+file.getOriginalFilename());
+  		  convertFile.createNewFile();
+  		  FileOutputStream fout = new FileOutputStream(convertFile);
+  		  fout.write(file.getBytes());
+  		  fout.close();
+  		  
+  		  System.out.println("store on local system successful");
+  		  this.uploadProfileImage(systemPath+java.io.File.separator+file.getOriginalFilename(),file.getContentType(),newFileName);
+  		  
+  		  return new ResponseEntity<>("Saved successfully",HttpStatus.OK); 
+  	      }
+  	  
 }
+
+//1-bBAfL8ap3f8KQ1ufljTYhHoBkahx-ac

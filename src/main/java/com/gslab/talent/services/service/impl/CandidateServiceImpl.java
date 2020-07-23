@@ -63,7 +63,8 @@ public class CandidateServiceImpl implements CandidateService {
 
 	@Override
 	public Long getCountAllByRejectedProfiles(ArrayList<Integer> ids) {
-		return candidateRepository.countAllByReject(ids);
+//		return candidateRepository.countAllByReject(ids);
+		return null;
 	}
 
 }
